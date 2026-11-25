@@ -1,0 +1,12 @@
+# Java build files
+*.class
+bin/
+out/
+
+# VS Code workspace
+.vscode/
+
+# Local user data and backups
+data/users.txt
+*.bak
+*.tmp
