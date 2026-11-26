@@ -134,6 +134,10 @@ public class OrderOperation {
 
     public void generateTestOrderData() {
         ensureDirectoryExists(DATA_DIR);
+        // Test orders must refer to products that already exist.
+        if (loadProductMetaMap().isEmpty()) {
+            return;
+        }
 
         List<String> existingUserLines = loadRawLines(USERS_FILE_PATH);
         Set<String> existingUserIds = new HashSet<>();
@@ -182,28 +186,13 @@ public class OrderOperation {
                     userId, userName, encryptedPassword, registerTime, email, mobile);
             existingUserLines.add(customerJson);
         }
-        saveRawLines(USERS_FILE_PATH, existingUserLines);
+        if (!saveRawLines(USERS_FILE_PATH, existingUserLines)) {
+            return;
+        }
 
         Map<String, ProductMeta> productMap = loadProductMetaMap();
         if (productMap.isEmpty()) {
-            List<String> fallbackProductLines = new ArrayList<>();
-            for (int i = 1; i <= 10; i++) {
-                String proId = String.format(Locale.ROOT, "pro_%05d", i);
-                String suffix = indexToLetters(i).toUpperCase(Locale.ROOT);
-                double rawPrice = 100.0 * i;
-                double discount = 10.0;
-                double currentPrice = rawPrice * (1.0 - discount / 100.0);
-                String productJson = String.format(
-                        Locale.ROOT,
-                        "{\"pro_id\":\"%s\", \"pro_model\":\"Model_%s\", \"pro_category\":\"General\", "
-                                + "\"pro_name\":\"Sample Product %s\", \"pro_current_price\":\"%.2f\", "
-                                + "\"pro_raw_price\":\"%.2f\", \"pro_discount\":\"%.2f\", "
-                                + "\"pro_likes_count\":\"%d\"}",
-                        proId, suffix, suffix, currentPrice, rawPrice, discount, i * 15);
-                fallbackProductLines.add(productJson);
-            }
-            saveRawLines(PRODUCTS_FILE_PATH, fallbackProductLines);
-            productMap = loadProductMetaMap();
+            return;
         }
 
         List<String> productIds = new ArrayList<>(productMap.keySet());
