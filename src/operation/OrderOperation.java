@@ -24,8 +24,6 @@ import java.util.Set;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import model.Order;
-import model.OrderListResult;
-import model.Product;
 
 public class OrderOperation {
     private static OrderOperation instance;
@@ -188,26 +186,21 @@ public class OrderOperation {
 
         Map<String, ProductMeta> productMap = loadProductMetaMap();
         if (productMap.isEmpty()) {
-            ProductOperation.getInstance().extractProductsFromFiles();
-            productMap = loadProductMetaMap();
-        }
-        if (productMap.isEmpty()) {
             List<String> fallbackProductLines = new ArrayList<>();
             for (int i = 1; i <= 10; i++) {
                 String proId = String.format(Locale.ROOT, "pro_%05d", i);
+                String suffix = indexToLetters(i).toUpperCase(Locale.ROOT);
                 double rawPrice = 100.0 * i;
                 double discount = 10.0;
                 double currentPrice = rawPrice * (1.0 - discount / 100.0);
-                Product sample = new Product(
-                        proId,
-                        "Model_" + indexToLetters(i).toUpperCase(Locale.ROOT),
-                        "General",
-                        "Sample Product " + indexToLetters(i).toUpperCase(Locale.ROOT),
-                        currentPrice,
-                        rawPrice,
-                        discount,
-                        i * 15);
-                fallbackProductLines.add(sample.toString());
+                String productJson = String.format(
+                        Locale.ROOT,
+                        "{\"pro_id\":\"%s\", \"pro_model\":\"Model_%s\", \"pro_category\":\"General\", "
+                                + "\"pro_name\":\"Sample Product %s\", \"pro_current_price\":\"%.2f\", "
+                                + "\"pro_raw_price\":\"%.2f\", \"pro_discount\":\"%.2f\", "
+                                + "\"pro_likes_count\":\"%d\"}",
+                        proId, suffix, suffix, currentPrice, rawPrice, discount, i * 15);
+                fallbackProductLines.add(productJson);
             }
             saveRawLines(PRODUCTS_FILE_PATH, fallbackProductLines);
             productMap = loadProductMetaMap();
@@ -679,12 +672,18 @@ public class OrderOperation {
             deflater.finish();
 
             ByteArrayOutputStream compressedStream = new ByteArrayOutputStream();
-            byte[] buffer = new byte[8192];
-            while (!deflater.finished()) {
-                int count = deflater.deflate(buffer);
-                compressedStream.write(buffer, 0, count);
+            try {
+                deflater.setInput(uncompressed);
+                deflater.finish();
+
+                byte[] buffer = new byte[8192];
+                while (!deflater.finished()) {
+                    int count = deflater.deflate(buffer);
+                    compressedStream.write(buffer, 0, count);
+                }
+            } finally {
+                deflater.end();
             }
-            deflater.end();
 
             try (FileOutputStream fos = new FileOutputStream(file)) {
                 fos.write(new byte[] { (byte) 137, 80, 78, 71, 13, 10, 26, 10 });

@@ -2,6 +2,7 @@ package operation;
 
 import java.util.ArrayList;
 import java.util.List;
+import model.Order;
 
 public class OrderListResult {
     private List<Order> orderList;
