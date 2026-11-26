@@ -91,16 +91,31 @@ public final class PngChart {
         return s.length() <= n ? s : s.substring(0, Math.max(0, n - 2)) + "..";
     }
 
+    // Choose integer tick intervals: 1, 2, 5, 10, 20, 50, ...
+    // This avoids repeated labels when a chart contains only a few items.
+    private static long integerTickStep(long maximum, int targetSteps) {
+        double rough = Math.max(1.0, (double) maximum / targetSteps);
+        double magnitude = Math.pow(10, Math.floor(Math.log10(rough)));
+        for (int factor : new int[]{1, 2, 5, 10}) {
+            double step = factor * magnitude;
+            if (step >= rough) return Math.max(1L, (long) Math.ceil(step));
+        }
+        return Math.max(1L, (long) Math.ceil(10 * magnitude));
+    }
+
     public static void bar(String title, List<String> labels, List<Long> values, String output) throws IOException {
         PngChart ch = new PngChart(960, 600);
         ch.header(title);
         int left = 85, top = 90, bottom = 490, right = 910;
         long max = 1;
         for (Long v : values) if (v != null) max = Math.max(max, v);
-        for (int i = 0; i <= 5; i++) {
-            int y = bottom - (bottom - top) * i / 5;
+        long tickStep = integerTickStep(max, 5);
+        int tickCount = (int) Math.ceil((double) max / tickStep);
+        double axisMaximum = (double) tickCount * tickStep;
+        for (int i = 0; i <= tickCount; i++) {
+            int y = bottom - (int) Math.round((bottom - top) * (double) i / tickCount);
             ch.line(left, y, right, y, GRID);
-            ch.text(8, y - 5, String.valueOf(max * i / 5), 1, INK);
+            ch.text(8, y - 5, String.valueOf(tickStep * i), 1, INK);
         }
         ch.line(left, bottom, right, bottom, INK);
         if (labels.isEmpty()) ch.text(350, 270, "NO DATA", 3, INK);
@@ -108,7 +123,7 @@ public final class PngChart {
         int slot = Math.max(1, (right - left) / n);
         for (int i = 0; i < labels.size(); i++) {
             long v = i < values.size() && values.get(i) != null ? Math.max(0, values.get(i)) : 0;
-            int hh = (int) Math.round((bottom - top) * (double) v / max);
+            int hh = (int) Math.round((bottom - top) * (double) v / axisMaximum);
             int bw = Math.max(1, (int) (slot * 0.7));
             int x = left + i * slot + (slot - bw) / 2;
             ch.rect(x, bottom - hh, bw, hh, COLORS[i % COLORS.length]);
@@ -158,13 +173,18 @@ public final class PngChart {
         int left = 100, right = 900, top = 90, bottom = 490;
         double maxX = 100, maxY = 1;
         for (double[] v : xy) { maxX = Math.max(maxX, v[0]); maxY = Math.max(maxY, v[1]); }
+        long yTickStep = integerTickStep((long) Math.ceil(maxY), 5);
+        int yTickCount = (int) Math.ceil(maxY / yTickStep);
+        double yAxisMaximum = (double) yTickStep * yTickCount;
+        for (int i = 0; i <= yTickCount; i++) {
+            int y = bottom - (int) Math.round((bottom - top) * (double) i / yTickCount);
+            ch.line(left, y, right, y, GRID);
+            ch.text(8, y - 5, String.valueOf(yTickStep * i), 1, INK);
+        }
         for (int i = 0; i <= 5; i++) {
             int x = left + (right - left) * i / 5;
-            int y = bottom - (bottom - top) * i / 5;
-            ch.line(left, y, right, y, GRID);
             ch.line(x, top, x, bottom, GRID);
             ch.text(x - 10, bottom + 18, String.valueOf((int) (maxX * i / 5)), 1, INK);
-            ch.text(8, y - 5, String.valueOf((long) (maxY * i / 5)), 1, INK);
         }
         ch.line(left, bottom, right, bottom, INK);
         ch.line(left, top, left, bottom, INK);
@@ -173,7 +193,7 @@ public final class PngChart {
         if (xy.isEmpty()) ch.text(365, 275, "NO DATA", 3, INK);
         for (double[] v : xy) {
             int x = left + (int) Math.round((right - left) * Math.max(0, v[0]) / maxX);
-            int y = bottom - (int) Math.round((bottom - top) * Math.max(0, v[1]) / maxY);
+            int y = bottom - (int) Math.round((bottom - top) * Math.max(0, v[1]) / yAxisMaximum);
             ch.circle(x, y, 4, COLORS[3]);
         }
         ch.save(output);
