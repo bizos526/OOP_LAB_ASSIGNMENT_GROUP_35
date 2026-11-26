@@ -1,3 +1,5 @@
+package model;
+
 public class Order {
     private String orderId;
     private String userId;
@@ -55,18 +57,19 @@ public class Order {
             return "";
         }
         return value.replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", " ")
-                .replace("\r", " ");
+                    .replace("\"", "\\\"")
+                    .replace("\n", " ")
+                    .replace("\r", " ");
     }
 
     @Override
     public String toString() {
         return String.format(
-                "{\"order_id\":\"%s\", \"user_id\":\"%s\", \"pro_id\":\"%s\", \"order_time\":\"%s\"}",
-                escapeJson(orderId),
-                escapeJson(userId),
-                escapeJson(proId),
-                escapeJson(orderTime));
+            "{\"order_id\":\"%s\", \"user_id\":\"%s\", \"pro_id\":\"%s\", \"order_time\":\"%s\"}",
+            escapeJson(orderId),
+            escapeJson(userId),
+            escapeJson(proId),
+            escapeJson(orderTime)
+        );
     }
 }

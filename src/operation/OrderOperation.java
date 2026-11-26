@@ -1,3 +1,5 @@
+package operation;
+
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
@@ -21,6 +23,9 @@ import java.util.Random;
 import java.util.Set;
 import java.util.zip.CRC32;
 import java.util.zip.Deflater;
+import model.Order;
+import model.OrderListResult;
+import model.Product;
 
 public class OrderOperation {
     private static OrderOperation instance;
@@ -71,12 +76,19 @@ public class OrderOperation {
             return false;
         }
 
+        String trimmedCustomerId = customerId.trim();
+        String trimmedProductId = productId.trim();
+
+        if (!isCustomerExists(trimmedCustomerId) || !isProductExists(trimmedProductId)) {
+            return false;
+        }
+
         String orderTime = (createTime == null || createTime.trim().isEmpty())
                 ? LocalDateTime.now().format(TIME_FORMATTER)
                 : createTime.trim();
 
         String orderId = generateUniqueOrderId();
-        Order newOrder = new Order(orderId, customerId.trim(), productId.trim(), orderTime);
+        Order newOrder = new Order(orderId, trimmedCustomerId, trimmedProductId, orderTime);
 
         List<Order> allOrders = loadAllOrders();
         allOrders.add(newOrder);
@@ -142,10 +154,10 @@ public class OrderOperation {
         }
 
         List<String> generatedCustomerIds = new ArrayList<>();
-        int suffix = 1;
+        int suffixIndex = 1;
         while (generatedCustomerIds.size() < 10) {
-            String userName = "test_customer_" + suffix;
-            suffix++;
+            String userName = "test_customer_" + indexToLetters(suffixIndex);
+            suffixIndex++;
             if (existingUserNames.contains(userName.toLowerCase(Locale.ROOT))) {
                 continue;
             }
@@ -162,7 +174,7 @@ public class OrderOperation {
 
             String encryptedPassword = encryptPassword("Pass12345");
             String registerTime = LocalDateTime.now().format(TIME_FORMATTER);
-            String email = userName + "@example.com";
+            String email = userName + "@gmail.com";
             String mobile = String.format(Locale.ROOT, "04%08d", random.nextInt(100000000));
 
             String customerJson = String.format(
@@ -175,13 +187,33 @@ public class OrderOperation {
         saveRawLines(USERS_FILE_PATH, existingUserLines);
 
         Map<String, ProductMeta> productMap = loadProductMetaMap();
-        List<String> productIds = new ArrayList<>(productMap.keySet());
-        if (productIds.isEmpty()) {
+        if (productMap.isEmpty()) {
+            ProductOperation.getInstance().extractProductsFromFiles();
+            productMap = loadProductMetaMap();
+        }
+        if (productMap.isEmpty()) {
+            List<String> fallbackProductLines = new ArrayList<>();
             for (int i = 1; i <= 10; i++) {
-                productIds.add(String.format(Locale.ROOT, "p_%05d", i));
+                String proId = String.format(Locale.ROOT, "pro_%05d", i);
+                double rawPrice = 100.0 * i;
+                double discount = 10.0;
+                double currentPrice = rawPrice * (1.0 - discount / 100.0);
+                Product sample = new Product(
+                        proId,
+                        "Model_" + indexToLetters(i).toUpperCase(Locale.ROOT),
+                        "General",
+                        "Sample Product " + indexToLetters(i).toUpperCase(Locale.ROOT),
+                        currentPrice,
+                        rawPrice,
+                        discount,
+                        i * 15);
+                fallbackProductLines.add(sample.toString());
             }
+            saveRawLines(PRODUCTS_FILE_PATH, fallbackProductLines);
+            productMap = loadProductMetaMap();
         }
 
+        List<String> productIds = new ArrayList<>(productMap.keySet());
         List<Order> allOrders = loadAllOrders();
         Set<String> existingOrderIds = new HashSet<>();
         for (Order o : allOrders) {
@@ -302,6 +334,33 @@ public class OrderOperation {
 
     public void deleteAllOrders() {
         saveAllOrders(new ArrayList<>());
+    }
+
+    private boolean isCustomerExists(String customerId) {
+        for (String line : loadRawLines(USERS_FILE_PATH)) {
+            Map<String, String> map = parseJsonObjectToMap(line);
+            String uid = map.getOrDefault("user_id", "");
+            String role = map.getOrDefault("user_role", "");
+            if (customerId.equals(uid) && "customer".equalsIgnoreCase(role)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isProductExists(String productId) {
+        return loadProductMetaMap().containsKey(productId);
+    }
+
+    private String indexToLetters(int index) {
+        StringBuilder sb = new StringBuilder();
+        int n = index;
+        while (n > 0) {
+            n--;
+            sb.insert(0, (char) ('a' + (n % 26)));
+            n /= 26;
+        }
+        return sb.toString();
     }
 
     private void ensureDirectoryExists(String dirPath) {
